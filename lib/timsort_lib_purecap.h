@@ -1,11 +1,9 @@
+#include "timsort_lib.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-bool isSorted(int *arr);
-void printArray(int *arr);
-void insertionSort(int *arr);
-void merge(int *arr);
-size_t min(size_t a, size_t b);
-void timSort(int *arr);
+void insertionSort_unsafe(int *arr);
+void merge_unsafe(int *arr);
+void timSort_purecap(int arr[], size_t length);

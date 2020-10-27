@@ -11,8 +11,9 @@
  */
 int main(int argc, char *argv[])
 {
+	size_t sz = 8192;
 
-	int *arr = random_chunk(8192);
+	int *arr = random_chunk(sz);
 
 	// place the chunk of data on the heap
 	if (NULL == arr)
@@ -21,7 +22,7 @@ int main(int argc, char *argv[])
 	}
 
 	// sort the data
-	timSort(arr, cheri_length_get(arr) / sizeof(int));
+	timSort_classic(arr, sz);
 
 	// clean up
 	free(arr);

@@ -8,70 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-const int RUN_LENGTH = 32;
-
-/**
- * Checks if an array of integers `arr` is sorted in ascending order. Uses capability instructions
- * to determine the array's length.
- * @param arr Array to sort
- * Capability implicit paramters:
- * - uses length of memory allocation chunk as upper bound (unit: bytes)
- */
-bool isSorted(int *arr)
-{
-	assert(cheri_is_valid(arr));
-	size_t length = cheri_getlen(arr) / sizeof(int);
-
-	// short-circuit: empty and singleton arrays are always sorted.
-	// still makes sense in capability land as lengths <= 1024 are exact
-	if (length <= 1)
-	{
-		return true;
-	}
-
-	for (size_t ix = 1; ix < length; ix++)
-	{
-		if (arr[ix - 1] > arr[ix])
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/**
- * Prints out an integer array. Uses capability instructions to determine the array's length.
- * @param arr array to print
- * Capability implicit paramters:
- * - uses length of memory allocation chunk as upper bound
- */
-void printArray(int *arr)
-{
-	assert(cheri_is_valid(arr));
-	size_t length = cheri_getlen(arr) / sizeof(int);
-
-	printf("Length: %lu  \n", length);
-
-	bool lastWasNewline = false;
-
-	for (size_t ix = 0; ix < length; ix++)
-	{
-		printf("%d  ", arr[ix]);
-		lastWasNewline = false;
-
-		if (0 == ix % RUN_LENGTH && 0 != ix)
-		{
-			printf("\n");
-			lastWasNewline = true;
-		}
-	}
-
-	if (!lastWasNewline)
-	{
-		printf("\n");
-	}
-}
+// this is needed to fall-black when the array length can not be represented exactly as CHERI bounds
+void timSort_classic(int arr[], size_t length);
 
 /**
  * Sorts the input array, in place, using `insertion sort`.
@@ -79,8 +17,10 @@ void printArray(int *arr)
  * Capability implicit paramters:
  * - uses offset to indicate lower bound (unit: bytes)
  * - uses length of memory allocation chunk as upper bound (unit: bytes)
+ * WARNING: the array length (encoded as bounds) is not always exactly representable
+ * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
  */
-void insertionSort(int *arr)
+void insertionSort_unsafe(int *arr)
 {
 	assert(cheri_is_valid(arr));
 	size_t lowerBound = cheri_getoffset(arr) / sizeof(int);
@@ -124,8 +64,10 @@ void insertionSort(int *arr)
  * Capability implicit paramters:
  * - uses offset to indicate the end of the first leg to merge (unit: bytes)
  * - uses length of memory allocation as end of sencond leg to merge (unit: bytes)
+ * WARNING: the array length (encoded as bounds) is not always exactly representable
+ * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
  */
-void merge(int *arr)
+void merge_unsafe(int *arr)
 {
 
 	// allocations
@@ -179,30 +121,17 @@ void merge(int *arr)
 }
 
 /**
- * Min of two size_t arguments.
- * @param a first value to choose from
- * @param b second value to choose from
- * @return The minimum value between `a` and `b`
- */
-size_t min(size_t a, size_t b)
-{
-	if (a <= b)
-	{
-		return a;
-	}
-	else
-	{
-		return b;
-	}
-}
-
-/**
  * Timsort routine for an array of `int`.
  * @param arr Array to sort
  * Capability implicit paramters:
  * - uses length of memory allocation chunk: n = cheri_getlen(arr) / sizeof(int)
+ * WARNING: the array length (encoded as bounds) is not always exactly representable
+ * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
+ *
+ * WARNING: This is function is not exported via `timsort_lib_purecap.h` and should only
+ * be used through `timSort_purecap()`
  */
-void timSort(int *arr)
+void timSort_unsafe(int *arr)
 {
 	size_t length = cheri_getlen(arr) / sizeof(int);
 
@@ -211,10 +140,19 @@ void timSort(int *arr)
 	{
 		size_t min_offset = min((ix + RUN_LENGTH), (length - 1));
 
-		int *arr_base_length_set = cheri_bounds_set(&arr[ix], (min_offset - ix) * sizeof(int));
-		arr_base_length_set = cheri_offset_set(arr, ix * sizeof(int));
-
-		insertionSort(arr_base_length_set);
+		// The array length (encoded as bounds) is not always exactly representable.
+		// With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact.
+		// For lengths <=1024 we can use CHERI bounds field to carry length.
+		if (RUN_LENGTH * sizeof(int) <= 1024)
+		{
+			int *arr_base_length_set = cheri_bounds_set(&arr[ix], (min_offset - ix) * sizeof(int));
+			arr_base_length_set = cheri_offset_set(arr, ix * sizeof(int));
+			insertionSort_unsafe(arr_base_length_set);
+		}
+		else
+		{
+			insertionSort(arr, ix, min_offset);
+		}
 	}
 
 	// Merge window doubles every iteration
@@ -229,8 +167,40 @@ void timSort(int *arr)
 			int *arr_base_length_set = cheri_bounds_set(&arr[left], (right - left) * sizeof(int));
 			arr_base_length_set = cheri_offset_set(arr_base_length_set, (mid - left) * sizeof(int));
 
-			merge(arr_base_length_set);
+			// as represented bounds may be inaccurate we check before dispatching
+			const size_t represented_fstHalfLength = cheri_getoffset(arr) / sizeof(int);
+			const size_t represented_sndHalfLength =
+				(cheri_getlen(arr) / sizeof(int)) - represented_fstHalfLength;
+
+			if (represented_fstHalfLength == (mid - left) &&
+				represented_sndHalfLength == (right - mid))
+			{
+				merge_unsafe(arr_base_length_set);
+			}
+			else
+			{
+				merge(arr, left, mid, right);
+			}
 		}
 	}
 }
 
+/**
+ * Timsort routine for an array of `int`.
+ * @param arr Array to sort
+ * @param length The legth of `arr`
+ */
+void timSort_purecap(int arr[], size_t length)
+{
+	size_t bounds_length = cheri_getlen(arr) / sizeof(int);
+
+	// as represented bounds may be inaccurate we check before dispatching
+	if (length == bounds_length)
+	{
+		timSort_unsafe(arr);
+	}
+	else
+	{
+		timSort_classic(arr, length);
+	}
+}

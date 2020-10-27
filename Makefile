@@ -21,14 +21,14 @@ lib/%: %.c
 bin/timsort: timsort.c lib/timsort_lib.o
 	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib.o
 
-bin/timsort_purecap: timsort_purecap.c lib/timsort_lib_purecap.o
-	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib_purecap.o 
+bin/timsort_purecap: timsort_purecap.c lib/timsort_lib_purecap.o lib/timsort_lib.o
+	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib_purecap.o lib/timsort_lib.o
 
 bin/test-timsort: test-timsort.c lib/timsort_lib.o
 	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib.o 
 
-bin/test-timsort_purecap: test-timsort_purecap.c lib/timsort_lib_purecap.o
-	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib_purecap.o 
+bin/test-timsort_purecap: test-timsort_purecap.c lib/timsort_lib_purecap.o lib/timsort_lib.o
+	$(CC) $(CFLAGS) $< -o $@ lib/timsort_lib_purecap.o lib/timsort_lib.o
 
 
 run-%: bin/%

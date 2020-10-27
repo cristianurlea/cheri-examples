@@ -14,7 +14,9 @@ void inspect_pointer(void *ptr);
 int main(int argc, char *argv[])
 {
 
-	int *arr = random_chunk(9158656);
+	size_t sz = 8192;
+
+	int *arr = random_chunk(sz);
 	// place the chunk of data on the heap
 	if (NULL == arr)
 	{
@@ -22,7 +24,7 @@ int main(int argc, char *argv[])
 	}
 
 	// sort the data
-	timSort(arr);
+	timSort_purecap(arr, sz);
 
 	// clean up
 	free(arr);

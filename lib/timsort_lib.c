@@ -1,15 +1,10 @@
 #include "timsort_lib.h"
-
-#include "../include/common.h"
 #include <assert.h>
 #include <cheri/cheric.h>
-#include <cheriintrin.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-const int RUN_LENGTH = 32;
 
 /**
  * Checks if an array of integers `arr` having length `length` is sorted in ascending order.
@@ -155,7 +150,7 @@ size_t min(size_t a, size_t b)
  * @param arr Array to sort
  * @param length The legth of `arr`
  */
-void timSort(int arr[], size_t length)
+void timSort_classic(int arr[], size_t length)
 {
 	// insertion sort on `RUN_LENGTH` segments
 	for (size_t i = 0; i < length; i += RUN_LENGTH)
@@ -175,4 +170,3 @@ void timSort(int arr[], size_t length)
 		}
 	}
 }
-
