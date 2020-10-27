@@ -1,5 +1,8 @@
 #include "lib/timsort_lib.h"
+#include "lib/timsortdata.h"
 #include <assert.h>
+
+const int MAX_ARRAY_SZ = 1024;
 
 bool arrEq(int arr_a[], int arr_b[], size_t lowerBound, size_t upperBound)
 {
@@ -51,33 +54,26 @@ void test_isSorted()
 	assert(!isSorted(sorted_array_small, 10));
 }
 
+
 void test_timsort()
 {
-	int data[] = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
-	const size_t arr_length = 20;
+	for (size_t sz =0; sz <= MAX_ARRAY_SZ; sz++) {
+		// place the chunk of data on the heap
+		int *arr = random_chunk(sz);
+		
+		assert(NULL != arr);
 
-	// place the chunk of data on the heap
-	int *arr = malloc(arr_length * sizeof(int));
-
-	assert(NULL != arr);
-
-	for (size_t ix = 0; ix < arr_length; ix++)
-	{
-		arr[ix] = data[ix];
+		// sort the data
+		timSort(arr,sz);
+		
+		// check that have done real work
+		assert(isSorted(arr,sz));
+		
+		// clean up
+		free(arr);
 	}
-
-	// ensure we start fair ( the data is not initially sorted )
-	assert(!isSorted(arr, arr_length));
-
-	// sort the data
-	timSort(arr, arr_length);
-
-	// check that have done real work
-	assert(isSorted(arr, arr_length));
-
-	// clean up
-	free(arr);
 }
+
 /**
  * Test harness for `timsort.c`.
  * @return EXIT_SUCCESS when all tests pass. EXIT_FAILURE otherwise
