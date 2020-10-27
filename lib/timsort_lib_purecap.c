@@ -148,7 +148,6 @@ void merge(int *arr)
 	size_t ix_out = 0;
 	while ((ix_fst < lengthFirstHalf) && (ix_snd < lengthSecondHalf))
 	{
-
 		if (firstHalf[ix_fst] <= secondHalf[ix_snd])
 		{
 			arr[ix_out++] = firstHalf[ix_fst++];
