@@ -13,7 +13,6 @@ void inspect_pointer(void *ptr);
  */
 int main(int argc, char *argv[])
 {
-
 	size_t sz = 8192;
 
 	int *arr = random_chunk(sz);
