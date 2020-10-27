@@ -112,7 +112,7 @@ void merge(int arr[], size_t lowerBound, size_t midPoint, size_t upperBound)
 		}
 	}
 
-	// copy straglers
+	// copy stragglers
 	if (ix_fst < lengthFirstHalf)
 	{
 		size_t delta = lengthFirstHalf - ix_fst;

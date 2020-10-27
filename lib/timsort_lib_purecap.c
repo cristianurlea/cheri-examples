@@ -159,7 +159,7 @@ void merge(int *arr)
 		}
 	}
 
-	// copy straglers
+	// copy stragglers
 	if (ix_fst < lengthFirstHalf)
 	{
 		size_t delta = lengthFirstHalf - ix_fst;
