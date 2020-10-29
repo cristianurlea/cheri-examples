@@ -4,9 +4,7 @@
 #include <stdlib.h>
 
 #ifndef RUN_LENGTH
-// WARNING: this must be a value that is *exactly* representable as a CHERI bounds field
-// With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
-#define RUN_LENGTH 32
+#define RUN_LENGTH 64
 #endif
 
 size_t min(size_t a, size_t b);

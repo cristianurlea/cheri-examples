@@ -34,36 +34,22 @@ bool isSorted(int arr[], size_t length)
  * Sorts the input array, in place, using `insertion sort`.
  * @param arr array to sort
  * @param lowerBound lower bound
- * @param upperBound upper bound
+ * @param arrayLength length of memory allocation chunk as upper bound (unit: int's)
  */
-void insertionSort(int arr[], size_t lowerBound, size_t upperBound)
+void insertionSort(int arr[], size_t lowerBound, size_t arrayLength)
 {
-	for (size_t ix = lowerBound + 1; ix <= upperBound; ix++)
+	int ix, ixValue, ixP;
+	for (ix = lowerBound + 1; ix < arrayLength; ix++)
 	{
-		int ix_value = arr[ix];
-		size_t ixp = ix - 1;
-		bool hitBottom = false;
+		ixValue = arr[ix];
+		ixP = ix - 1;
 
-		while ((ixp >= lowerBound) && (arr[ixp] > ix_value))
+		while (ixP >= 0 && arr[ixP] > ixValue)
 		{
-			arr[ixp + 1] = arr[ixp];
-
-			if (ixp > 0)
-			{
-				ixp--;
-			}
-			else
-			{
-				arr[ixp] = ix_value;
-				hitBottom = true;
-				break;
-			}
+			arr[ixP + 1] = arr[ixP];
+			ixP = ixP - 1;
 		}
-
-		if (!hitBottom)
-		{
-			arr[ixp + 1] = ix_value;
-		}
+		arr[ixP + 1] = ixValue;
 	}
 }
 
@@ -152,10 +138,15 @@ size_t min(size_t a, size_t b)
  */
 void timSort_classic(int arr[], size_t length)
 {
+	if (length <= 1)
+	{
+		return;
+	}
+
 	// insertion sort on `RUN_LENGTH` segments
 	for (size_t i = 0; i < length; i += RUN_LENGTH)
 	{
-		insertionSort(arr, i, min((i + RUN_LENGTH), (length - 1)));
+		insertionSort(arr, i, min(i + RUN_LENGTH + 1, length));
 	}
 	// Merge window doubles every iteration
 	for (size_t size = RUN_LENGTH; size < length; size *= 2)

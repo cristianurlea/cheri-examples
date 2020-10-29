@@ -2,21 +2,6 @@
 #include "lib/timsortdata.h"
 #include <assert.h>
 
-const int MAX_ARRAY_SZ = 2048;
-
-bool arrEq(int arr_a[], int arr_b[], size_t lowerBound, size_t upperBound)
-{
-	for (size_t ix = lowerBound; ix <= upperBound; ix++)
-	{
-		if (arr_a[ix] != arr_b[ix])
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
 void test_merge()
 {
 	int input_arr_control[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -56,21 +41,32 @@ void test_isSorted()
 
 void test_timsort_classic()
 {
-	for (size_t sz = 0; sz <= MAX_ARRAY_SZ; sz++)
+	for (size_t sz = 2; sz <= MAX_ARRAY_SZ; sz++)
 	{
 		// place the chunk of data on the heap
 		int *arr = random_chunk(sz);
+		int *arr_cpy = malloc(sz * sizeof(int));
 
 		assert(NULL != arr);
+		assert(NULL != arr_cpy);
+
+		memcpy(arr_cpy, arr, sz * sizeof(int));
+
+		assert(arrEq(arr, arr_cpy, 0, sz - 1));
 
 		// sort the data
 		timSort_classic(arr, sz);
 
+		// stable sort comparison
+		qsort(arr_cpy, sz, sizeof(int), cmpfunc);
+
 		// check that have done real work
 		assert(isSorted(arr, sz));
+		assert(arrEq(arr, arr_cpy, 0, sz - 1));
 
 		// clean up
 		free(arr);
+		free(arr_cpy);
 	}
 }
 

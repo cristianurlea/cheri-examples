@@ -5,11 +5,44 @@
 #include <cheriintrin.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 // this is needed to fall-black when the array length can not be represented exactly as CHERI bounds
 void timSort_classic(int arr[], size_t length);
+
+/**
+ * Strict capability pointer equality check that includes the `offset` and `bounds` fields.
+ * @param a first capability pointer to be checked.
+ * @param b second capability pointer to be checked
+ * @returns True if pointers have equal: bases, address offsets and lengths.
+ */
+bool offsetBoundsEq(int *a, int *b)
+{
+	return (a == b && cheri_getlen(a) == cheri_getlen(b) &&
+			cheri_getoffset(a) == cheri_getoffset(b));
+}
+
+/**
+ * Attempts to encode exact upper and lower bounds through CHERI fields.
+ * @param arr is the source capability. If successful `offsetBoundsEq(arr, <return value> )` will be
+ * false.
+ * @param lowerBound is encoded as CHERI `offset` ( if successful )
+ * @param arrayLength is encoded as CHERI `length` ( if successful )
+ * @returns new capbility pointer with exact `offset` and `length` on success, `arr` otherwise.
+ */
+int *local_setBounds(int *arr, const size_t lowerBound, const size_t arrayLength)
+{
+	int *upperSet = cheri_bounds_set(arr, arrayLength * sizeof(int));
+	int *lowerSet = cheri_offset_set(upperSet, lowerBound * sizeof(int));
+
+	if (lowerBound == cheri_getoffset(lowerSet) / sizeof(int) &&
+		arrayLength == cheri_getlen(lowerSet) / sizeof(int))
+	{
+		return lowerSet;
+	}
+
+	return arr;
+}
 
 /**
  * Sorts the input array, in place, using `insertion sort`.
@@ -18,43 +51,27 @@ void timSort_classic(int arr[], size_t length);
  * - uses offset to indicate lower bound (unit: bytes)
  * - uses length of memory allocation chunk as upper bound (unit: bytes)
  * WARNING: the array length (encoded as bounds) is not always exactly representable
- * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
  */
 void insertionSort_unsafe(int *arr)
 {
-	assert(cheri_is_valid(arr));
 	size_t lowerBound = cheri_getoffset(arr) / sizeof(int);
-	size_t upperBound = (cheri_getlen(arr) / sizeof(int)) - lowerBound;
+	size_t arrayLength = cheri_getlen(arr) / sizeof(int);
 
 	// reset offset otherwise arr[x] is actually arr[x+offset]
 	arr = cheri_offset_set(arr, 0);
 
-	for (size_t ix = lowerBound + 1; ix < upperBound; ix++)
+	int ix, ixValue, ixP;
+	for (ix = lowerBound + 1; ix < arrayLength; ix++)
 	{
-		int ix_value = arr[ix];
-		size_t ixp = ix - 1;
-		bool hitBottom = false;
+		ixValue = arr[ix];
+		ixP = ix - 1;
 
-		while ((ixp >= lowerBound) && (arr[ixp] > ix_value))
+		while (ixP >= 0 && arr[ixP] > ixValue)
 		{
-			arr[ixp + 1] = arr[ixp];
-
-			if (ixp > 0)
-			{
-				ixp--;
-			}
-			else
-			{
-				arr[ixp] = ix_value;
-				hitBottom = true;
-				break;
-			}
+			arr[ixP + 1] = arr[ixP];
+			ixP = ixP - 1;
 		}
-
-		if (!hitBottom)
-		{
-			arr[ixp + 1] = ix_value;
-		}
+		arr[ixP + 1] = ixValue;
 	}
 }
 
@@ -65,11 +82,9 @@ void insertionSort_unsafe(int *arr)
  * - uses offset to indicate the end of the first leg to merge (unit: bytes)
  * - uses length of memory allocation as end of sencond leg to merge (unit: bytes)
  * WARNING: the array length (encoded as bounds) is not always exactly representable
- * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
  */
 void merge_unsafe(int *arr)
 {
-
 	// allocations
 	size_t lengthFirstHalf = cheri_getoffset(arr) / sizeof(int);
 	size_t lengthSecondHalf = (cheri_getlen(arr) / sizeof(int)) - lengthFirstHalf;
@@ -126,9 +141,7 @@ void merge_unsafe(int *arr)
  * Capability implicit paramters:
  * - uses length of memory allocation chunk: n = cheri_getlen(arr) / sizeof(int)
  * WARNING: the array length (encoded as bounds) is not always exactly representable
- * With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact
- *
- * WARNING: This is function is not exported via `timsort_lib_purecap.h` and should only
+ * This is function is not exported via `timsort_lib_purecap.h` and should only
  * be used through `timSort_purecap()`
  */
 void timSort_unsafe(int *arr)
@@ -138,48 +151,36 @@ void timSort_unsafe(int *arr)
 	// insertion sort on `RUN_LENGTH` segments
 	for (size_t ix = 0; ix < length; ix += RUN_LENGTH)
 	{
-		size_t min_offset = min((ix + RUN_LENGTH), (length - 1));
+		size_t max_ix = min((ix + RUN_LENGTH) + 1, length);
+		int *maybeBounded = local_setBounds(arr, ix, max_ix);
 
-		// The array length (encoded as bounds) is not always exactly representable.
-		// With -march=rv64imafdcxcheri -mabi=l64pc128d any value <= 1024 is exact.
-		// For lengths <=1024 we can use CHERI bounds field to carry length.
-		if (RUN_LENGTH * sizeof(int) <= 1024)
+		if (offsetBoundsEq(arr, maybeBounded))
 		{
-			int *arr_base_length_set = cheri_bounds_set(&arr[ix], (min_offset - ix) * sizeof(int));
-			arr_base_length_set = cheri_offset_set(arr, ix * sizeof(int));
-			insertionSort_unsafe(arr_base_length_set);
+			insertionSort(arr, ix, max_ix);
 		}
 		else
 		{
-			insertionSort(arr, ix, min_offset);
+			insertionSort_unsafe(maybeBounded);
 		}
 	}
-
 	// Merge window doubles every iteration
 	for (size_t size = RUN_LENGTH; size < length; size *= 2)
 	{
 		// Merge
-		for (size_t left = 0; left + size < length; left += 2 * size)
+		for (size_t left = 0; left + size < length - 1; left += 2 * size)
 		{
 			size_t mid = left + size;
 			size_t right = min((left + 2 * size), (length - 1));
 
-			int *arr_base_length_set = cheri_bounds_set(&arr[left], (right - left) * sizeof(int));
-			arr_base_length_set = cheri_offset_set(arr_base_length_set, (mid - left) * sizeof(int));
+			int *maybeBounded = local_setBounds(arr, mid, right);
 
-			// as represented bounds may be inaccurate we check before dispatching
-			const size_t represented_fstHalfLength = cheri_getoffset(arr) / sizeof(int);
-			const size_t represented_sndHalfLength =
-				(cheri_getlen(arr) / sizeof(int)) - represented_fstHalfLength;
-
-			if (represented_fstHalfLength == (mid - left) &&
-				represented_sndHalfLength == (right - mid))
+			if (offsetBoundsEq(arr, maybeBounded))
 			{
-				merge_unsafe(arr_base_length_set);
+				merge(arr, left, mid, right);
 			}
 			else
 			{
-				merge(arr, left, mid, right);
+				merge_unsafe(maybeBounded);
 			}
 		}
 	}
@@ -192,8 +193,12 @@ void timSort_unsafe(int *arr)
  */
 void timSort_purecap(int arr[], size_t length)
 {
-	size_t bounds_length = cheri_getlen(arr) / sizeof(int);
+	if (length <= 1)
+	{
+		return;
+	}
 
+	size_t bounds_length = cheri_getlen(arr) / sizeof(int);
 	// as represented bounds may be inaccurate we check before dispatching
 	if (length == bounds_length)
 	{
