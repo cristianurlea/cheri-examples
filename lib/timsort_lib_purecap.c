@@ -28,7 +28,7 @@ bool offsetBoundsEq(int *a, int *b)
  * false.
  * @param lowerBound is encoded as CHERI `offset` ( if successful )
  * @param arrayLength is encoded as CHERI `length` ( if successful )
- * @returns new capbility pointer with exact `offset` and `length` on success, `arr` otherwise.
+ * @returns new capability pointer with exact `offset` and `length` on success, `arr` otherwise.
  */
 int *local_setBounds(int *arr, const size_t lowerBound, const size_t arrayLength)
 {
