@@ -153,8 +153,9 @@ void timSort_unsafe(int *arr)
 	{
 		size_t max_ix = min((ix + RUN_LENGTH) + 1, length);
 		int *maybeBounded = local_setBounds(arr, ix, max_ix);
-
-		if (offsetBoundsEq(arr, maybeBounded))
+		
+		bool cheriBoundsExactlyRepresented = offsetBoundsEq(arr, maybeBounded);
+		if (cheriBoundsExactlyRepresented)
 		{
 			insertionSort(arr, ix, max_ix);
 		}
@@ -173,8 +174,9 @@ void timSort_unsafe(int *arr)
 			size_t right = min((left + 2 * size), (length - 1));
 
 			int *maybeBounded = local_setBounds(arr, mid, right);
-
-			if (offsetBoundsEq(arr, maybeBounded))
+			bool cheriBoundsExactlyRepresented = offsetBoundsEq(arr, maybeBounded);
+			
+			if (cheriBoundsExactlyRepresented)
 			{
 				merge(arr, left, mid, right);
 			}
